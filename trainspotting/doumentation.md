@@ -21,7 +21,7 @@ These are the classes that are introduced:
 
 * ``Section``: Represents a *directed* rail section on the map that allows a train to travel in a certain direction. Each section has a single sensor placed at the end of the section, and shares the same resources (i.e. semaphore) with the section that supports travelling in the opposite direction.
 
-* ``Track``: This is actually a subclass of ``Section``. But unlike a normal section, a track can be connected to other tracks via ``Connection``s.
+* ``Track``: This is actually a subclass of ``Section``. But unlike a normal section, a track can be connected to other tracks via ``Connection``.
 
 * ``Connection``: Represents the connection between a track and a next track, with a switch in between.
 
@@ -29,11 +29,11 @@ These are the classes that are introduced:
 
 * For my solution, I use 20 different sensors, each sensor corresponds to either the start or the end of a ``Section``.
 
-* This means there are also 20 different ``Section``s. These sections are divided into 10 pairs, where each pair refers to the same locations on the map, but one is for heading towards A, and the other one is for heading towards B.
+* This means there are also 20 different ``Section``. These sections are divided into 10 pairs, where each pair refers to the same locations on the map, but one is for heading towards A, and the other one is for heading towards B.
 
-* Out of these 10 pairs, 8 of them are actually pairs of ``Tracks``s. Each pair will have a semaphore for sharing the resources between the trains.
+* Out of these 10 pairs, 8 of them are actually pairs of ``Tracks``. Each pair will have a semaphore for sharing the resources between the trains.
 
-* The other 2 pairs of ``Section``s are for the intersection that lies close to station B. These 2 pairs will share the same semaphore, since these sections are part of a critical section.
+* The other 2 pairs of ``Section`` are for the intersection that lies close to station B. These 2 pairs will share the same semaphore, since these sections are part of a critical section.
 
 * There are only 3 critical sections as shown in ``documentation.png``. These are the parts that are shared between both trains, but only one train is allowed to occupy at a time.
 
