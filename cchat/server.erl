@@ -1,87 +1,69 @@
 -module(server).
 -export([start/1,stop/1]).
 
--record(server_st, {
-    c2m, % dictionary mapping every channel to its members (represented by the PIDs)
-    m2n  % dictionary mapping every member (represented by the PID) to its nick name
+-record(state, {
+    nicks,   % list of all nicks registered so far
+    channels % list of all channels created so far
 }).
 
 initial_state() ->
-    #server_st{
-        c2m = dict:new(),
-        m2n = dict:new()
+    #state{
+        nicks = [],
+        channels = []
     }.
 
+%
+% handle/2 handles each kind of request from client process.
+%
+% Parameters:
+% (1) St: the current state of the server.
+% (2) Request: request data from the client.
+%
+% Must return a tuple {reply, Data, NewState}, where:
+% (1) Data is what that is to be sent back to the client, which must be one of the following:
+%       - The atom `ok`
+%       - The tuple {error, ErrorAtom, ErrorMessage}
+% (2) NewState is the updated state of the server.
+%
+
+% Client request to join a channel
 handle(St, {join, ClientPid, ClientNick, Channel}) ->
-    case dict:find(Channel, St#server_st.c2m) of
-        {ok, Members} ->
-            % Channel has been created
-            case lists:member(ClientPid, Members) of
-                true ->
-                    % Client has already joined
-                    {reply, {error, user_already_joined, "User already joined "++Channel}, St};
-                false ->
-                    % Client has not joined
-                    NewC2M = dict:append(Channel, ClientPid, St#server_st.c2m),
-                    NewM2N = dict:store(ClientPid, ClientNick, St#server_st.m2n),
-                    {reply, ok, St#server_st{c2m=NewC2M, m2n=NewM2N}}
-                end;
-        error ->
-            % Channel has not been created
-            NewC2M = dict:store(Channel, [ClientPid], St#server_st.c2m),
-            NewM2N = dict:store(ClientPid, ClientNick, St#server_st.m2n),
-            {reply, ok, St#server_st{c2m=NewC2M, m2n=NewM2N}}
+    NewNicksList =
+        case lists:member(ClientNick, St#state.nicks) of
+            true  -> St#state.nicks;
+            false -> [ClientNick | St#state.nicks]
+        end,
+    NewChannelsList =
+        case lists:member(Channel, St#state.channels) of
+            true  -> St#state.channels;
+            false -> channel:start(Channel), [Channel | St#state.channels]
+        end,
+    ChannelResponse = genserver:request(list_to_atom(Channel), {join, ClientPid}),
+    {reply, ChannelResponse, St#state{nicks=NewNicksList, channels=NewChannelsList}};
+
+% Client request to change nick
+handle(St, {nick, OldNick, NewNick}) ->
+    case lists:member(NewNick, St#state.nicks) of
+        true  ->
+            {reply, {error, nick_taken, "Nick "++NewNick++" has been taken!"}, St};
+        false ->
+            NewNicksList = [NewNick | lists:delete(OldNick, St#state.nicks)],
+            {reply, ok, St#state{nicks=NewNicksList}}
         end;
 
-handle(St, {leave, ClientPid, Channel}) ->
-    case dict:find(Channel, St#server_st.c2m) of
-        {ok, Members} ->
-            % Channel has been created
-            case lists:member(ClientPid, Members) of
-                true ->
-                    % Client has already joined
-                    NewC2M = dict:store(Channel, lists:delete(ClientPid, Members), St#server_st.c2m),
-                    {reply, ok, St#server_st{c2m=NewC2M}};
-                false ->
-                    % Client has not joined
-                    {reply, {error, user_not_joined, "User has not joined "++Channel}, St}
-                end;
-        error ->
-            % Channel has not been created
-            {reply, {error, user_not_joined, "User has not joined "++Channel}, St}
-        end;
+% Client request to quit
+handle(St, {quit, ClientNick}) ->
+    NewNicksList = lists:delete(ClientNick, St#state.nicks),
+    {reply, ok, St#state{nicks=NewNicksList}};
 
-handle(St, {message_send, ClientPid, Channel, Msg}) ->
-    case dict:find(Channel, St#server_st.c2m) of
-        {ok, Members} ->
-            % Channel has been created
-            case lists:member(ClientPid, Members) of
-                true ->
-                    % Client has already joined
-                    ClientNick = dict:fetch(ClientPid, St#server_st.m2n),
-                    OtherMembers = lists:delete(ClientPid, Members),
-                    Data = {request, self(), make_ref(), {message_receive, Channel, ClientNick, Msg}},
-                    lists:foreach((fun(Member) -> Member ! Data end), OtherMembers),
-                    {reply, ok, St};
-                false ->
-                    % Client has not joined
-                    {reply, {error, user_not_joined, "User has not joined "++Channel}, St}
-                end;
-        error ->
-            % Channel has not been created
-            {reply, {error, user_not_joined, "User has not joined "++Channel}, St}
-        end;
-
-% TODO: Think about the atom here
+% Catch-all for any unhandled requests
 handle(St, _) ->
-    {reply, {error, unknown_request, "Unknown request"}, St}.
+    {reply, {error, not_implemented, "Server cannot handle this request!"}, St} .
 
-% Start a new server process with the given name
-% Do not change the signature of this function.
+% Start a new server process with the given name.
 start(ServerAtom) ->
     genserver:start(ServerAtom, initial_state(), fun handle/2).
 
-% Stop the server process registered to the given name,
-% together with any other associated processes
+% Stop the server process registered to the given name.
 stop(ServerAtom) ->
     genserver:stop(ServerAtom).
