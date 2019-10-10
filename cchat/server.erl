@@ -44,7 +44,9 @@ handle(St, {join, ClientPid, ClientNick, Channel}) ->
 % Client request to change nick
 handle(St, {nick, OldNick, NewNick}) ->
     case lists:member(NewNick, St#state.nicks) of
-        true  ->
+        true when OldNick =:= NewNick ->
+            {reply, ok, St};
+        true ->
             {reply, {error, nick_taken, "Nick "++NewNick++" has been taken!"}, St};
         false ->
             NewNicksList = [NewNick | lists:delete(OldNick, St#state.nicks)],
