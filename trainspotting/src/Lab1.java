@@ -235,12 +235,15 @@ class Map {
             sensorsToSectionsMapping.put(sensor, this);
         }
 
-        public boolean isAvailable() {
-            return semaphore.availablePermits() > 0;
-        }
-
         public Direction getTravelDirection() {
             return this.travelDirection;
+        }
+
+        /**
+         * Check if the section is available for acquiring. If yes, acquire right away.
+         */
+        public boolean tryAcquire() {
+            return semaphore.tryAcquire();
         }
 
         /**
@@ -249,7 +252,9 @@ class Map {
         public void acquire() {
             try {
                 semaphore.acquire();
-            } catch (InterruptedException ignored) {
+            } catch (InterruptedException e) {
+                e.printStackTrace();
+                System.exit(1);
             }
         }
 
@@ -287,8 +292,12 @@ class Map {
                 Connection connection = connections.get(i);
                 Track nextTrack = connection.getNextTrack();
 
-                if (i == connections.size() - 1 || nextTrack.isAvailable()) {
+                if (i == connections.size() - 1) {
                     nextTrack.acquire();
+                    connection.makeRailSwitch();
+                    return true;
+                }
+                else if (nextTrack.tryAcquire()) {
                     connection.makeRailSwitch();
                     return true;
                 }
