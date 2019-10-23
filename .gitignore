@@ -1,3 +1,6 @@
+/amazed/**/*.class
+/cchat/*.beam
+/cchat/*.dump
 /trainspotting/bin/*
 /tsim/*
 !/tsim/tsim-0.84.tgz
