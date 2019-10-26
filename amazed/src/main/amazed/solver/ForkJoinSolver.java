@@ -91,10 +91,8 @@ public class ForkJoinSolver extends SequentialSolver {
         while (!frontier.isEmpty() && !found) {
             int currentNode = frontier.pop();
 
-            if (visited.contains(currentNode)) {
+            if (!visited.add(currentNode)) {
                 continue;
-            } else {
-                visited.add(currentNode);
             }
             maze.move(player, currentNode);
 
